@@ -40,33 +40,36 @@ function renderBoard() {
                 cell.classList.add('blue'); // Peón azul
             }
 
+            // Manejar clicks para mover el peón
+            cell.addEventListener('click', () => handleMoveClick(adjustedRow, adjustedCol));
+
             boardElement.appendChild(cell);
         }
     }
 }
 
-// Manejar los movimientos del peón
-document.addEventListener('keydown', (event) => {
+function handleMoveClick(clickedRow, clickedCol) {
     const currentPlayer = gameState.currentPlayer;
-    if (currentPlayer === playerRole) {
-        let direction = '';
-        switch (event.key) {
-            case 'ArrowUp':
-                direction = playerRole === 'player1' ? 'up' : 'down'; // Jugador 1 mueve hacia arriba, Jugador 2 hacia abajo
-                break;
-            case 'ArrowDown':
-                direction = playerRole === 'player1' ? 'down' : 'up'; // Inverso para el jugador 2
-                break;
-            case 'ArrowLeft':
-                direction = playerRole === 'player1' ? 'left' : 'right'; // Espejado para el jugador 2
-                break;
-            case 'ArrowRight':
-                direction = playerRole === 'player1' ? 'right' : 'left'; // Espejado para el jugador 2
-                break;
-        }
+    const playerPos = gameState.positions[playerRole];
 
-        if (direction) {
-            socket.emit('move', { direction });
-        }
+    // Verificar si es el turno del jugador y si el clic es a una casilla adyacente
+    if (currentPlayer === playerRole && isAdjacent(playerPos.row, playerPos.col, clickedRow, clickedCol)) {
+        socket.emit('move', { direction: getMoveDirection(playerPos.row, playerPos.col, clickedRow, clickedCol) });
     }
-});
+}
+
+// Función para verificar si la casilla clickeada es adyacente
+function isAdjacent(row, col, clickedRow, clickedCol) {
+    const rowDiff = Math.abs(row - clickedRow);
+    const colDiff = Math.abs(col - clickedCol);
+    return (rowDiff + colDiff === 1); // Adyacente es si la suma de diferencias es 1 (sin diagonales)
+}
+
+// Función para obtener la dirección del movimiento basado en la celda clickeada
+function getMoveDirection(currentRow, currentCol, clickedRow, clickedCol) {
+    if (clickedRow < currentRow) return 'up';
+    if (clickedRow > currentRow) return 'down';
+    if (clickedCol < currentCol) return 'left';
+    if (clickedCol > currentCol) return 'right';
+    return '';
+}
