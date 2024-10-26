@@ -41,43 +41,52 @@ io.on('connection', (socket) => {
     socket.emit('update', gameState);
 
     // Manejar movimiento del peón
-    socket.on('move', ({ direction }) => {
-        // Solo permitir el movimiento si es el turno del jugador actual
-        if (gameState.currentPlayer !== playerRole) {
-            return; // No es el turno de este jugador
-        }
+    // Manejar movimiento del peón
+socket.on('move', ({ direction }) => {
+    // Solo permitir el movimiento si es el turno del jugador actual
+    if (gameState.currentPlayer !== playerRole) {
+        return; // No es el turno de este jugador
+    }
 
-        const playerPos = gameState.positions[playerRole];
-        let newRow = playerPos.row;
-        let newCol = playerPos.col;
+    const playerPos = gameState.positions[playerRole];
+    let newRow = playerPos.row;
+    let newCol = playerPos.col;
 
-        // Calcular la nueva posición en función de la dirección
-        switch (direction) {
-            case 'up':
-                newRow -= 1;
-                break;
-            case 'down':
-                newRow += 1;
-                break;
-            case 'left':
-                newCol -= 1;
-                break;
-            case 'right':
-                newCol += 1;
-                break;
-        }
+    // Calcular la nueva posición en función de la dirección
+    switch (direction) {
+        case 'up':
+            newRow -= 1;
+            break;
+        case 'down':
+            newRow += 1;
+            break;
+        case 'left':
+            newCol -= 1;
+            break;
+        case 'right':
+            newCol += 1;
+            break;
+    }
 
-        // Validar que el movimiento esté dentro de los límites del tablero
-        if (newRow >= 0 && newRow < 9 && newCol >= 0 && newCol < 9) {
-            gameState.positions[playerRole] = { row: newRow, col: newCol };
+    // Validar que el movimiento esté dentro de los límites del tablero
+    if (newRow >= 0 && newRow < 9 && newCol >= 0 && newCol < 9) {
+        gameState.positions[playerRole] = { row: newRow, col: newCol };
 
-            // Cambiar el turno al otro jugador
+        // Verificar condición de victoria
+        if (playerRole === 'player1' && newRow === 0) {
+            io.emit('update', gameState);
+            io.emit('victory', { winner: 'player1' });
+        } else if (playerRole === 'player2' && newRow === 8) {
+            io.emit('update', gameState);
+            io.emit('victory', { winner: 'player2' });
+        } else {
+            // Cambiar el turno al otro jugador si no hay victoria
             gameState.currentPlayer = playerRole === 'player1' ? 'player2' : 'player1';
-
-            // Actualizar a ambos jugadores
             io.emit('update', gameState);
         }
-    });
+    }
+});
+
 
     socket.on('disconnect', () => {
         console.log('Un jugador se ha desconectado');

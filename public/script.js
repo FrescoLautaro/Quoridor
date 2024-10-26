@@ -1,7 +1,14 @@
 const socket = io();
 const boardElement = document.getElementById('board');
+const messageElement = document.createElement('div'); // Crear un elemento para el mensaje de victoria/derrota
+
 let playerRole;
 let gameState = {};
+let gameOver = false; // Estado para verificar si la partida ha terminado
+
+// Configuración del mensaje al inicio
+messageElement.classList.add('message');
+document.body.appendChild(messageElement);
 
 // Escuchar el rol del jugador
 socket.on('role', ({ role }) => {
@@ -12,10 +19,13 @@ socket.on('role', ({ role }) => {
 // Escuchar actualizaciones del estado del juego
 socket.on('update', (state) => {
     gameState = state;
+    checkVictory(); // Verificar si hay un ganador
     renderBoard();
 });
 
 function renderBoard() {
+    if (gameOver) return; // No renderizar si la partida ha terminado
+
     boardElement.innerHTML = ''; // Limpiar el tablero
 
     for (let row = 0; row < 9; row++) {
@@ -29,8 +39,8 @@ function renderBoard() {
 
             if (playerRole === 'player2') {
                 // Espejar la posición para el jugador 2 (azul)
-                adjustedRow = 8 - row; // Invertir filas
-                adjustedCol = 8 - col; // Invertir columnas
+                adjustedRow = 8 - row;
+                adjustedCol = 8 - col;
             }
 
             // Agregar peones con distinción de colores
@@ -49,6 +59,8 @@ function renderBoard() {
 }
 
 function handleMoveClick(clickedRow, clickedCol) {
+    if (gameOver) return; // No permitir movimientos si la partida ha terminado
+
     const currentPlayer = gameState.currentPlayer;
     const playerPos = gameState.positions[playerRole];
 
@@ -72,4 +84,24 @@ function getMoveDirection(currentRow, currentCol, clickedRow, clickedCol) {
     if (clickedCol < currentCol) return 'left';
     if (clickedCol > currentCol) return 'right';
     return '';
+}
+
+// Función para verificar si hay un ganador
+function checkVictory() {
+    const player1Win = gameState.positions.player1.row === 0; // Ganar si llega a la primera fila
+    const player2Win = gameState.positions.player2.row === 8; // Ganar si llega a la última fila
+
+    if (player1Win || player2Win) {
+        gameOver = true; // Marcar la partida como finalizada
+        const winner = player1Win ? 'player1' : 'player2';
+        const isWinner = (playerRole === winner);
+        showEndMessage(isWinner ? '¡Has ganado!' : 'Has perdido');
+    }
+}
+
+// Función para mostrar un mensaje al final del juego
+function showEndMessage(message) {
+    messageElement.innerHTML = message;
+    messageElement.style.opacity = 1;
+    messageElement.classList.add('visible');
 }
