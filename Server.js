@@ -9,14 +9,20 @@ const io = socketIo(server);
 app.use(express.static('public'));
 
 let gameState = {
-    currentPlayer: 'player1', // Comienza el jugador 1
+    currentPlayer: 'player1',
     positions: {
-        player1: { row: 8, col: 4 }, // Peón rojo abajo
-        player2: { row: 0, col: 4 }, // Peón azul arriba
+        player1: { row: 8, col: 4 },
+        player2: { row: 0, col: 4 },
     },
+    walls: [],
+    remainingWalls: {
+        player1: 10,
+        player2: 10
+    }
 };
 
 let playerCount = 0;
+let rematchRequests = 0;
 
 app.get('/', (req, res) => {
     res.sendFile(__dirname + '/public/index.html');
@@ -26,73 +32,86 @@ io.on('connection', (socket) => {
     playerCount++;
     console.log('Un jugador se ha conectado');
 
-    // Asignar rol al jugador según el orden de conexión
     let playerRole = playerCount === 1 ? 'player1' : 'player2';
 
     if (playerCount > 2) {
-        // Evitar más de 2 jugadores
         socket.emit('message', 'El juego ya está completo.');
         socket.disconnect();
         return;
     }
 
-    // Enviar el rol del jugador y el estado del juego actual
     socket.emit('role', { role: playerRole });
     socket.emit('update', gameState);
 
-    // Manejar movimiento del peón
-    // Manejar movimiento del peón
-socket.on('move', ({ direction }) => {
-    // Solo permitir el movimiento si es el turno del jugador actual
-    if (gameState.currentPlayer !== playerRole) {
-        return; // No es el turno de este jugador
-    }
+    socket.on('move', ({ direction }) => {
+        if (gameState.currentPlayer !== playerRole) return;
 
-    const playerPos = gameState.positions[playerRole];
-    let newRow = playerPos.row;
-    let newCol = playerPos.col;
+        const playerPos = gameState.positions[playerRole];
+        let newRow = playerPos.row;
+        let newCol = playerPos.col;
 
-    // Calcular la nueva posición en función de la dirección
-    switch (direction) {
-        case 'up':
-            newRow -= 1;
-            break;
-        case 'down':
-            newRow += 1;
-            break;
-        case 'left':
-            newCol -= 1;
-            break;
-        case 'right':
-            newCol += 1;
-            break;
-    }
+        switch (direction) {
+            case 'up':
+                newRow -= 1;
+                break;
+            case 'down':
+                newRow += 1;
+                break;
+            case 'left':
+                newCol -= 1;
+                break;
+            case 'right':
+                newCol += 1;
+                break;
+        }
 
-    // Validar que el movimiento esté dentro de los límites del tablero
-    if (newRow >= 0 && newRow < 9 && newCol >= 0 && newCol < 9) {
-        gameState.positions[playerRole] = { row: newRow, col: newCol };
+        if (newRow >= 0 && newRow < 9 && newCol >= 0 && newCol < 9) {
+            if (!gameState.walls.some(wall => (wall.row === newRow && wall.col === newCol) || (wall.row === newRow && wall.col + 1 === newCol))) {
+                gameState.positions[playerRole] = { row: newRow, col: newCol };
+                gameState.currentPlayer = playerRole === 'player1' ? 'player2' : 'player1';
+                io.emit('update', gameState);
+            }
+        }
+    });
 
-        // Verificar condición de victoria
-        if (playerRole === 'player1' && newRow === 0) {
-            io.emit('update', gameState);
-            io.emit('victory', { winner: 'player1' });
-        } else if (playerRole === 'player2' && newRow === 8) {
-            io.emit('update', gameState);
-            io.emit('victory', { winner: 'player2' });
-        } else {
-            // Cambiar el turno al otro jugador si no hay victoria
+    socket.on('placeWall', ({ row, col }) => {
+        if (gameState.remainingWalls[playerRole] > 0) {
+            gameState.walls.push({ row, col });
+            gameState.remainingWalls[playerRole]--;
             gameState.currentPlayer = playerRole === 'player1' ? 'player2' : 'player1';
             io.emit('update', gameState);
         }
-    }
-});
+    });
 
+    socket.on('requestRematch', () => {
+        rematchRequests++;
+        if (rematchRequests >= 2) {
+            rematchRequests = 0;
+            resetGame();
+            io.emit('rematchAccepted', gameState);
+        }
+    });
 
     socket.on('disconnect', () => {
         console.log('Un jugador se ha desconectado');
         playerCount--;
     });
 });
+
+function resetGame() {
+    gameState = {
+        currentPlayer: 'player1',
+        positions: {
+            player1: { row: 8, col: 4 },
+            player2: { row: 0, col: 4 },
+        },
+        walls: [],
+        remainingWalls: {
+            player1: 10,
+            player2: 10
+        }
+    };
+}
 
 server.listen(3000, () => {
     console.log('Servidor escuchando en http://localhost:3000');
