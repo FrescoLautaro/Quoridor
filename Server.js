@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require('express'); 
 const http = require('http');
 const socketIo = require('socket.io');
 
@@ -11,8 +11,8 @@ app.use(express.static('public'));
 let gameState = {
     currentPlayer: 'player1',
     positions: {
-        player1: { row: 8, col: 4 },
-        player2: { row: 0, col: 4 },
+        player1: { row: 10, col: 5 },
+        player2: { row: 0, col: 5 },
     },
     walls: [],
     remainingWalls: {
@@ -32,7 +32,7 @@ io.on('connection', (socket) => {
     playerCount++;
     console.log('Un jugador se ha conectado');
 
-    let playerRole = playerCount === 1 ? 'player1' : 'player2';
+    const playerRole = playerCount === 1 ? 'player1' : 'player2';
 
     if (playerCount > 2) {
         socket.emit('message', 'El juego ya está completo.');
@@ -42,6 +42,7 @@ io.on('connection', (socket) => {
 
     socket.emit('role', { role: playerRole });
     socket.emit('update', gameState);
+    socket.broadcast.emit('update', gameState);
 
     socket.on('move', ({ direction }) => {
         if (gameState.currentPlayer !== playerRole) return;
@@ -51,32 +52,40 @@ io.on('connection', (socket) => {
         let newCol = playerPos.col;
 
         switch (direction) {
-            case 'up':
-                newRow -= 1;
-                break;
-            case 'down':
-                newRow += 1;
-                break;
-            case 'left':
-                newCol -= 1;
-                break;
-            case 'right':
-                newCol += 1;
-                break;
+            case 'up': newRow -= 1; break;
+            case 'down': newRow += 1; break;
+            case 'left': newCol -= 1; break;
+            case 'right': newCol += 1; break;
         }
 
-        if (newRow >= 0 && newRow < 9 && newCol >= 0 && newCol < 9) {
-            if (!gameState.walls.some(wall => (wall.row === newRow && wall.col === newCol) || (wall.row === newRow && wall.col + 1 === newCol))) {
+        if (newRow >= 0 && newRow < 11 && newCol >= 0 && newCol < 11) {
+            if (!gameState.walls.some(wall => (wall.row === newRow && wall.col === newCol))) {
                 gameState.positions[playerRole] = { row: newRow, col: newCol };
                 gameState.currentPlayer = playerRole === 'player1' ? 'player2' : 'player1';
                 io.emit('update', gameState);
+                checkVictory();
             }
         }
     });
 
-    socket.on('placeWall', ({ row, col }) => {
-        if (gameState.remainingWalls[playerRole] > 0) {
-            gameState.walls.push({ row, col });
+    socket.on('placeWall', ({ row, col, orientation }) => {
+        if (gameState.remainingWalls[playerRole] <= 0) return;
+
+        const wallPositions = [];
+        if (orientation === 'horizontal' && col < 10) {
+            wallPositions.push({ row, col }, { row, col: col + 1 });
+        } else if (orientation === 'vertical' && row < 10) {
+            wallPositions.push({ row, col }, { row: row + 1, col });
+        } else {
+            return;
+        }
+
+        const isOccupied = wallPositions.some(pos =>
+            gameState.walls.some(wall => wall.row === pos.row && wall.col === pos.col)
+        );
+
+        if (!isOccupied) {
+            gameState.walls.push(...wallPositions);
             gameState.remainingWalls[playerRole]--;
             gameState.currentPlayer = playerRole === 'player1' ? 'player2' : 'player1';
             io.emit('update', gameState);
@@ -98,12 +107,23 @@ io.on('connection', (socket) => {
     });
 });
 
+function checkVictory() {
+    const player1Win = gameState.positions.player1.row === 0;
+    const player2Win = gameState.positions.player2.row === 10;
+
+    if (player1Win || player2Win) {
+        const winner = player1Win ? 'player1' : 'player2';
+        io.emit('gameOver', { winner });
+        resetGame();
+    }
+}
+
 function resetGame() {
     gameState = {
         currentPlayer: 'player1',
         positions: {
-            player1: { row: 8, col: 4 },
-            player2: { row: 0, col: 4 },
+            player1: { row: 10, col: 5 },
+            player2: { row: 0, col: 5 },
         },
         walls: [],
         remainingWalls: {
