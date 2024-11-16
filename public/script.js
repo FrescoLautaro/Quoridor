@@ -9,6 +9,8 @@ let gameState = {};
 let gameOver = false;
 let wallMode = false;
 let wallOrientation = 'horizontal';
+const turnIndicator = document.getElementById('turn-indicator');
+
 
 messageElement.classList.add('message');
 document.body.appendChild(messageElement);
@@ -23,10 +25,12 @@ socket.on('role', ({ role }) => {
 // Actualizar el estado del juego
 socket.on('update', (state) => {
     gameState = state;
+    wallMode = false; // Desactiva el modo de muro al recibir una actualización
     checkVictory();
     renderBoard();
     renderWalls();
 });
+
 
 // Manejar la aceptación de revancha
 socket.on('rematchAccepted', (state) => {
@@ -40,6 +44,15 @@ socket.on('rematchAccepted', (state) => {
 // Función para renderizar el tablero
 function renderBoard() {
     if (gameOver) return;
+
+    // Actualizar el texto y color del indicador de turno
+    if (gameState.currentPlayer === playerRole) {
+        turnIndicator.innerText = 'Tu turno';
+        turnIndicator.style.color = '#00ff00'; // Verde
+    } else {
+        turnIndicator.innerText = 'Turno del oponente';
+        turnIndicator.style.color = '#ff0000'; // Rojo
+    }
 
     boardElement.innerHTML = '';
     boardElement.style.gridTemplateColumns = 'repeat(11, 60px)';
@@ -87,6 +100,7 @@ function renderBoard() {
         }
     }
 }
+
 
 // Función para renderizar botones de muros
 function renderWalls() {
