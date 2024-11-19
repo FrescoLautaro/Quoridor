@@ -22,14 +22,6 @@ socket.on('role', ({ role }) => {
     renderBoard();
 });
 
-// Actualizar el estado del juego
-socket.on('update', (state) => {
-    gameState = state;
-    wallMode = false; // Desactiva el modo de muro al recibir una actualización
-    checkVictory();
-    renderBoard();
-    renderWalls();
-});
 
 
 // Manejar la aceptación de revancha
@@ -162,7 +154,20 @@ function getMoveDirection(currentRow, currentCol, clickedRow, clickedCol) {
     return '';
 }
 
-// Comprobar si hay un ganador
+socket.on('update', (state) => {
+    gameState = state;
+    wallMode = false;
+
+    // Renderizar el tablero primero
+    renderBoard();
+    renderWalls();
+
+    // Verificar victoria con un pequeño retraso
+    setTimeout(() => {
+        checkVictory();
+    }, 100); // Retraso de 100ms para permitir el renderizado
+});
+
 function checkVictory() {
     const player1Win = gameState.positions.player1.row === 0;
     const player2Win = gameState.positions.player2.row === 10;
@@ -171,9 +176,11 @@ function checkVictory() {
         gameOver = true;
         const winner = player1Win ? 'player1' : 'player2';
         const isWinner = (playerRole === winner);
+
         showEndMessage(isWinner ? '¡Has ganado!' : 'Has perdido');
     }
 }
+
 
 // Mostrar mensaje de fin de juego
 function showEndMessage(message) {
